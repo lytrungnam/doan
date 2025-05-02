@@ -1,0 +1,46 @@
+version: '3'
+
+services:
+  client:
+    build:
+      context: ../client
+      dockerfile: ../docker/client.dockerfile
+    ports:
+      - '3000:3000'
+    depends_on:
+      - server
+    environment:
+      - REACT_APP_API_URL=http://server:5000
+
+  server:
+    build:
+      context: ../server
+      dockerfile: ../docker/server.dockerfile
+    ports:
+      - '5000:5000'
+    depends_on:
+      - mongodb
+      - ai-service
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017/harmful-content-detection
+      - AI_SERVICE_URL=http://ai-service:8000
+      - JWT_SECRET=your_jwt_secret
+
+  ai-service:
+    build:
+      context: ../ai-service
+      dockerfile: ../docker/ai-service.dockerfile
+    ports:
+      - '8000:8000'
+    volumes:
+      - ../ai-service/models:/app/models
+
+  mongodb:
+    image: mongo:latest
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongodb_data:/data/db
+
+volumes:
+  mongodb_data:
