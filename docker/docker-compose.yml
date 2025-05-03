@@ -1,46 +1,83 @@
-version: '3'
+version: '3.8'
 
 services:
   client:
     build:
-      context: ../client
-      dockerfile: ../docker/client.dockerfile
+      context: ../
+      dockerfile: docker/client.dockerfile
     ports:
-      - '3000:3000'
+      - "3000:3000"
     depends_on:
       - server
+    volumes:
+      - ../client:/app
+      - /app/node_modules
     environment:
-      - REACT_APP_API_URL=http://server:5000
+      - NODE_ENV=development
+      - REACT_APP_API_URL=http://server:5000/api
+    networks:
+      - app-network
 
   server:
     build:
-      context: ../server
-      dockerfile: ../docker/server.dockerfile
+      context: ../
+      dockerfile: docker/server.dockerfile
     ports:
-      - '5000:5000'
+      - "5000:5000"
     depends_on:
       - mongodb
       - ai-service
+    volumes:
+      - ../server:/app
+      - /app/node_modules
+      - ../server/uploads:/app/uploads
     environment:
-      - MONGODB_URI=mongodb://mongodb:27017/harmful-content-detection
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://mongodb:27017/content-analyzer
+      - JWT_SECRET=your_jwt_secret_key_here
       - AI_SERVICE_URL=http://ai-service:8000
-      - JWT_SECRET=your_jwt_secret
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION}
+      - S3_BUCKET=${S3_BUCKET}
+    networks:
+      - app-network
 
   ai-service:
     build:
-      context: ../ai-service
-      dockerfile: ../docker/ai-service.dockerfile
+      context: ../
+      dockerfile: docker/ai-service.dockerfile
     ports:
-      - '8000:8000'
+      - "8000:8000"
     volumes:
+      - ../ai-service:/app
       - ../ai-service/models:/app/models
+    environment:
+      - MODEL_PATH=/app/models
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=INFO
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - app-network
 
   mongodb:
     image: mongo:latest
     ports:
-      - '27017:27017'
+      - "27017:27017"
     volumes:
       - mongodb_data:/data/db
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
 
 volumes:
   mongodb_data:
